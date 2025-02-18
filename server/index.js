@@ -14,17 +14,54 @@ app.get('/api/qa/questions', async (req, res) => {
   console.log('body:', req.body, 'query:', req.query)
   var input = Number(req.query.product_id)
   var query = {
-    text: 'SELECT * FROM questions WHERE product_id = ($1)',
+    text: "SELECT * FROM questions WHERE product_id = ($1) AND reported = 'false'",
     values: [input]
   }
 
   var result = await client.query(query);
+
+  var questionIds = result.rows.map((row) => row.id);
+
+  console.log(questionIds)
+
+  var answersQuery = {
+    text: "SELECT * FROM answers WHERE question_id = ANY ($1) AND reported = 'false'",
+    values: questionIds
+  }
+  var answers = [];
+
+  for await (var id of questionIds) {
+    var query = {
+      text: "SELECT * FROM answers WHERE question_id = ($1) AND reported = 'false'",
+      values: [id]
+    }
+    var answer = await client.query(query)
+    answers.push(answer.rows)
+  }
+
+  console.log(answers)
+
   res.send(result.rows)
+})
+
+
+app.get('/api/qa/questions/:question_id/answers', async (req, res) => {
+  var id = Number(req.params.question_id);
+
+  console.log(id)
+  var query = {
+    text: "SELECT * FROM answers WHERE question_id = ($1) AND reported = 'false'",
+    values: [id]
+  }
+
+  var answers = await client.query(query)
+  res.send(answers.rows)
 })
 
 app.post('/api/qa/questions', async (req, res) => {
 
   var date = new Date().toDateString()
+
   var values = {
     ...req.body,
     date: date,
@@ -33,11 +70,27 @@ app.post('/api/qa/questions', async (req, res) => {
    };
 
   var query = {
-    text: 'INSERT INTO questions (product_id, body, date, helpfulness, reported, asker_name) VALUES ($1, $2, $3, $4, $5. $6)',
+    text: 'INSERT INTO questions (product_id, body, date, helpfulness, reported, asker_name) VALUES ($1, $2, $3, $4, $5, $6)',
     values: [values.product_id, values.body, values.date, values.helpfulness, values.reported, values.name]
   }
   await client.query(query);
   res.send('successfully added question')
+})
+
+app.post('api/qa/questions/:question_id/answers', async (req, res) => {
+  var date = new Date().toDateString();
+
+  var values = {
+    ...req.body,
+    date: date,
+    helpfulness: 0,
+    reported: false
+  }
+
+  var query = {
+    text: 'INSERT INTO answers (question_id, body, date, helpfulness, reported) VALUES ($1, $2, $3, $4, $5)',
+    values: [values.product_id, values.body, values.date, values.helpfulness, values.reported, values.name]
+  }
 })
 
 app.put('/api/qa/questions/:question_id/helpful', async (req, res) => {
@@ -91,6 +144,9 @@ client.connect()
   .then(() => console.log(`successfully connected to ${client.database} on ${client.port}`))
   .catch((err) => console.log(err))
 
-app.listen(process.env.PORT, () => {
+var server = app.listen(process.env.PORT, () => {
   console.log(`listening on ${process.env.PORT}`)
 })
+
+
+module.exports = server;
