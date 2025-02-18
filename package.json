@@ -1,7 +1,7 @@
 {
   "scripts": {
     "server-dev": "npx nodemon --watch server server/index.js",
-    "test-related-items": "npx jest /server/__tests__/servertests.js"
+    "test-server": "npx jest /server/__tests__/servertests.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
