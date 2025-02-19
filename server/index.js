@@ -14,15 +14,14 @@ app.get('/api/qa/questions', async (req, res) => {
   console.log('body:', req.body, 'query:', req.query)
   var input = Number(req.query.product_id)
   var query = {
-    text: "SELECT * FROM questions WHERE product_id = ($1) AND reported = 'false'",
+    text: "SELECT id, product_id, body, date, asker_name, helpfulness FROM questions WHERE product_id = ($1) AND reported = 'false'",
     values: [input]
   }
 
   var result = await client.query(query);
+  result.rows.forEach((row) => row.answers = [])
 
   var questionIds = result.rows.map((row) => row.id);
-
-  console.log(questionIds)
 
   var answersQuery = {
     text: "SELECT * FROM answers WHERE question_id = ANY ($1) AND reported = 'false'",
@@ -36,11 +35,16 @@ app.get('/api/qa/questions', async (req, res) => {
       values: [id]
     }
     var answer = await client.query(query)
-    answers.push(answer.rows)
+    answers = answers.concat(answer.rows)
   }
 
-  console.log(answers)
-
+  for (var i = 0; i < answers.length; i++) {
+    for (var j = 0; j < result.rows.length; j++) {
+      if (result.rows[j].id === answers[i].question_id) {
+        result.rows[j].answers.push(answers[i])
+      }
+    }
+  }
   res.send(result.rows)
 })
 
@@ -48,7 +52,6 @@ app.get('/api/qa/questions', async (req, res) => {
 app.get('/api/qa/questions/:question_id/answers', async (req, res) => {
   var id = Number(req.params.question_id);
 
-  console.log(id)
   var query = {
     text: "SELECT * FROM answers WHERE question_id = ($1) AND reported = 'false'",
     values: [id]
@@ -77,19 +80,21 @@ app.post('/api/qa/questions', async (req, res) => {
   res.send('successfully added question')
 })
 
-app.post('api/qa/questions/:question_id/answers', async (req, res) => {
+app.post('/api/qa/questions/:question_id/answers', async (req, res) => {
   var date = new Date().toDateString();
 
   var values = {
     ...req.body,
+    question_id: req.params.question_id,
     date: date,
     helpfulness: 0,
     reported: false
   }
 
+  console.log(values)
   var query = {
-    text: 'INSERT INTO answers (question_id, body, date, helpfulness, reported) VALUES ($1, $2, $3, $4, $5)',
-    values: [values.product_id, values.body, values.date, values.helpfulness, values.reported, values.name]
+    text: 'INSERT INTO answers (question_id, body, answerer_name, date, helpfulness, reported) VALUES ($1, $2, $3, $4, $5. $6)',
+    // values: [values.product_id, values.body, values.date, values.helpfulness, values.reported]
   }
 })
 
