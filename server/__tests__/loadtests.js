@@ -4,18 +4,6 @@ import { sleep } from 'k6';
 export const options = {
   stages: [
     // {
-    //   duration: '30s',
-    //   target: 100
-    // }
-    {
-      duration: '60s',
-      target: 100
-    }
-    // {
-    //   duration: '60s',
-    //   target: 0
-    // }
-    // {
     //   duration: '60s',
     //   target: 1
     // }
@@ -23,7 +11,10 @@ export const options = {
     //   duration: '60s',
     //   target: 10
     // }
-
+    {
+      duration: '60s',
+      target: 100
+    }
   ]
   // 1 minute 1000
   // 1 minute 0
@@ -37,6 +28,6 @@ export const options = {
 };
 
 export default function() {
-  http.get('http://localhost:3000/api/qa/questions/40347/answers');
+  http.get('http://localhost:3000/api/qa/questions?product_id=1');
   sleep(1);
 }

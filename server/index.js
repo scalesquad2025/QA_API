@@ -6,47 +6,67 @@ const axios = require('axios');
 
 const app = express();
 
-app.use(express.static(path.join(__dirname, '../client/dist')));
 app.use(express.json())
 
 app.get('/api/qa/questions', async (req, res) => {
-  console.log('body:', req.body, 'query:', req.query)
-  var input = Number(req.query.product_id)
+  var product_id = req.query.product_id
+
+  var result = {
+    product_id: product_id,
+    results: []
+  }
+
   var query = {
-    text: "SELECT id, product_id, body, date, asker_name, helpfulness FROM questions WHERE product_id = ($1) AND reported = 'false'",
-    values: [input]
+    text: `WITH questions AS (
+      SELECT
+        q.id AS question_id,
+        q.product_id,
+        q.body AS question_body,
+        q.date AS question_date,
+        q.asker_name,
+        q.helpfulness AS question_helpfulness,
+        q.reported,
+        json_object_agg(
+          a.answer_id,
+          json_build_object(
+            'id', a.answer_id,
+            'body', a.answer_body,
+            'date', a.answer_date,
+            'answerer_name', a.answerer_name,
+            'helpfulness', a.answer_helpfulness,
+            'photos', COALESCE(
+              (SELECT json_agg(json_build_object('id', p.photo_id, 'url', p.Url))
+              FROM Photos p
+              WHERE p.answer_id = a.answer_id),
+              '[]'::json
+            )
+          )
+        ) FILTER (WHERE a.answer_id IS NOT NULL) AS answers
+      FROM Questions q
+      LEFT JOIN Answers a ON q.id = a.question_id
+      WHERE q.product_id = ($1) AND q.reported = false
+      GROUP BY q.id
+      )
+      SELECT
+            json_build_object(
+              'question_id', question_id,
+              'question_body', question_body,
+              'question_date', question_date,
+              'asker_name', asker_name,
+              'question_helpfulness', question_helpfulness,
+              'reported', reported,
+              'answers', answers
+            )
+        AS results
+      FROM questions`,
+   values: [product_id]
   }
 
-  var result = await client.query(query);
-  result.rows.forEach((row) => row.answers = [])
+  var test = await client.query(query)
 
-  var questionIds = result.rows.map((row) => row.id);
-
-  var answersQuery = {
-    text: "SELECT * FROM answers WHERE question_id = ANY ($1) AND reported = 'false'",
-    values: questionIds
-  }
-  var answers = [];
-
-  for await (var id of questionIds) {
-    var query = {
-      text: "SELECT * FROM answers WHERE question_id = ($1) AND reported = 'false'",
-      values: [id]
-    }
-    var answer = await client.query(query)
-    answers = answers.concat(answer.rows)
-  }
-
-  for (var i = 0; i < answers.length; i++) {
-    for (var j = 0; j < result.rows.length; j++) {
-      if (result.rows[j].id === answers[i].question_id) {
-        result.rows[j].answers.push(answers[i])
-      }
-    }
-  }
-  res.send(result.rows)
+  result['results'] = test.rows[0].results
+  res.send(result)
 })
-
 
 app.get('/api/qa/questions/:question_id/answers', async (req, res) => {
   var id = Number(req.params.question_id);
@@ -57,7 +77,7 @@ app.get('/api/qa/questions/:question_id/answers', async (req, res) => {
   }
 
   var answers = await client.query(query)
-  res.send(answers.rows)
+  res.send(result)
 })
 
 app.post('/api/qa/questions', async (req, res) => {
@@ -93,7 +113,7 @@ app.post('/api/qa/questions/:question_id/answers', async (req, res) => {
   console.log(values)
   var query = {
     text: 'INSERT INTO answers (question_id, body, answerer_name, date, helpfulness, reported) VALUES ($1, $2, $3, $4, $5. $6)',
-    // values: [values.product_id, values.body, values.date, values.helpfulness, values.reported]
+    values: [values.question_id, values.body, values.answerer_name, values.date, values.helpfulness, values.reported]
   }
 })
 

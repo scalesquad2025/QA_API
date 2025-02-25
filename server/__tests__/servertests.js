@@ -11,13 +11,6 @@ const client = new Client({
   port: 5432 // Default PostgreSQL port
 })
 
-// beforeEach(async () => {
-//   await client.connect();
-// });
-
-// afterEach(async () => {
-//   await client.end();
-// });
 
 describe('GET api/qa/questions', () => {
 
