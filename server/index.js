@@ -1,10 +1,12 @@
 const { Client } = require('pg');
+const NodeCache = require( "node-cache" );
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
 
 const app = express();
+const cache = new NodeCache();
 
 app.use(express.json())
 
@@ -16,57 +18,66 @@ app.get('/api/qa/questions', async (req, res) => {
     results: []
   }
 
-  var query = {
-    text: `WITH questions AS (
-      SELECT
-        q.id AS question_id,
-        q.product_id,
-        q.body AS question_body,
-        q.date AS question_date,
-        q.asker_name,
-        q.helpfulness AS question_helpfulness,
-        q.reported,
-        json_object_agg(
-          a.answer_id,
-          json_build_object(
-            'id', a.answer_id,
-            'body', a.answer_body,
-            'date', a.answer_date,
-            'answerer_name', a.answerer_name,
-            'helpfulness', a.answer_helpfulness,
-            'photos', COALESCE(
-              (SELECT json_agg(json_build_object('id', p.photo_id, 'url', p.Url))
-              FROM Photos p
-              WHERE p.answer_id = a.answer_id),
-              '[]'::json
-            )
-          )
-        ) FILTER (WHERE a.answer_id IS NOT NULL) AS answers
-      FROM Questions q
-      LEFT JOIN Answers a ON q.id = a.question_id
-      WHERE q.product_id = ($1) AND q.reported = false
-      GROUP BY q.id
-      )
-      SELECT
+  value = cache.get( "questions" );
+
+  if ( value == undefined ){
+    var query = {
+      text: `WITH questions AS (
+        SELECT
+          q.id AS question_id,
+          q.product_id,
+          q.body AS question_body,
+          q.date AS question_date,
+          q.asker_name,
+          q.helpfulness AS question_helpfulness,
+          q.reported,
+          json_object_agg(
+            a.answer_id,
             json_build_object(
-              'question_id', question_id,
-              'question_body', question_body,
-              'question_date', question_date,
-              'asker_name', asker_name,
-              'question_helpfulness', question_helpfulness,
-              'reported', reported,
-              'answers', answers
+              'id', a.answer_id,
+              'body', a.answer_body,
+              'date', a.answer_date,
+              'answerer_name', a.answerer_name,
+              'helpfulness', a.answer_helpfulness,
+              'photos', COALESCE(
+                (SELECT json_agg(json_build_object('id', p.photo_id, 'url', p.Url))
+                FROM Photos p
+                WHERE p.answer_id = a.answer_id),
+                '[]'::json
+              )
             )
-        AS results
-      FROM questions`,
-   values: [product_id]
+          ) FILTER (WHERE a.answer_id IS NOT NULL) AS answers
+        FROM Questions q
+        LEFT JOIN Answers a ON q.id = a.question_id
+        WHERE q.product_id = ($1) AND q.reported = false
+        GROUP BY q.id
+        )
+        SELECT
+              json_build_object(
+                'question_id', question_id,
+                'question_body', question_body,
+                'question_date', question_date,
+                'asker_name', asker_name,
+                'question_helpfulness', question_helpfulness,
+                'reported', reported,
+                'answers', answers
+              )
+          AS results
+        FROM questions`,
+     values: [product_id]
+    }
+
+    var test = await client.query(query)
+
+    result['results'] = test.rows[0].results
+    cache.set("questions", result)
+    res.send(result)
+  } else {
+    var q = cache.get("questions")
+    res.send(q)
   }
-
-  var test = await client.query(query)
-
-  result['results'] = test.rows[0].results
-  res.send(result)
 })
+
 
 app.get('/api/qa/questions/:question_id/answers', async (req, res) => {
   var id = Number(req.params.question_id);
