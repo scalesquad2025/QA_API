@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
+require('dotenv').config();
 
 export const options = {
   stages: [
@@ -28,6 +29,6 @@ export const options = {
 };
 
 export default function() {
-  http.get('http://localhost:3000/api/qa/questions?product_id=1');
+  http.get(`http://${process.env.HOST}:${process.env.PORT}/api/qa/questions?product_id=1`);
   sleep(1);
 }
