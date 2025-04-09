@@ -169,7 +169,7 @@ app.put('/api/qa/questions/:question_id/report', async (req, res) => {
 
 const client = new Client({
   user: process.env.USER,
-  host: process.env.HOST,
+  host: process.env.DB_HOST,
   database: process.env.DATABASE,
   password: process.env.PASSWORD,
   port: 5432 // Default PostgreSQL port
