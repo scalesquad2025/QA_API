@@ -181,7 +181,7 @@ client.connect()
 
 var server = app.listen(process.env.PORT, () => {
   console.log(`listening on host ${process.env.HOST}, port ${process.env.PORT}`)
-  console.log(`db on server ${client.host}, port ${client.port}`)
+  console.log(`db on server ${client.host}, port ${client.port}, user ${client.user}, database ${client.database}`)
 })
 
 
